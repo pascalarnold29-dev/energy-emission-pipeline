@@ -59,6 +59,53 @@ This project addresses that gap by creating a scalable data pipeline that:
  └───────────────────────────────────────────────────────┘
 ```
 
+## Main Components
+The project is structured into five main components, each representing one stage of the Kappa data flow architecture:
+
+| Component | Description | Technologies |
+|------------|--------------|---------------|
+| **1. Metrics Collector** | Collects CPU, GPU, RAM, and other system metrics and sends them as JSON messages. | Python, psutil, pynvml, confluent-kafka |
+| **2. Kafka Ingestion Layer** | Serves as the message broker that ingests metric streams from multiple users or machines. | Apache Kafka |
+| **3. Spark Streaming Processor** | Processes incoming metric streams, computes energy and CO₂ usage, and aggregates results. | PySpark Structured Streaming |
+| **4. Storage Layer** | Stores aggregated data for short-term and long-term analysis. | MongoDB (hot data), HDFS (cold data) |
+| **5. Visualization Dashboard** | Displays energy and emission metrics interactively. | Streamlit |
+
+## Team Roles and Responsibilities
+The group consists of five members, each responsible for one main component of the pipeline. This allows for modular development and parallel progress.
+
+| Role | Responsibility | Short-Term Goals (Week 1–2) |
+|------|----------------|-------------------------------|
+| **Team Member A – Data Collector Developer** | Develops the Python-based system metrics collector. | Create a prototype that collects CPU/GPU/RAM data every few seconds and outputs JSON locally or to Kafka. |
+| **Team Member B – Kafka Engineer** | Sets up and manages the Kafka broker and topics. | Deploy Kafka, create the topic `training.metrics`, and verify message ingestion. |
+| **Team Member C – Spark Developer** | Implements the Spark Structured Streaming job. | Read test messages from Kafka or JSON files, perform initial transformations, and prepare aggregation logic. |
+| **Team Member D – Storage Engineer** | Handles database and data model design. | Configure MongoDB and HDFS, define schema, and store test records. |
+| **Team Member E – Visualization Engineer** | Builds the Streamlit dashboard. | Display example metrics from static JSON files to prepare for later MongoDB integration. |
+
+## Parallel Development Strategy
+Although the pipeline components are sequential, parallel development is enabled through simulation and modular design:
+
+| Component | Independent Development Strategy |
+|------------|----------------------------------|
+| **Collector** | Can operate independently, saving JSON files locally before Kafka integration. |
+| **Kafka** | Can be tested with manually produced JSON messages. |
+| **Spark** | Can process static JSON files before connecting to Kafka. |
+| **MongoDB** | Can be populated manually with test data to test queries and visualization. |
+| **Dashboard** | Can display dummy data to finalize the UI before real data integration. |
+
+## Development Plan (Two Weeks)
+**Week 1: Local Prototypes**
+- Collector produces JSON output with system metrics.
+- Kafka runs locally and accepts test messages.
+- Spark reads local JSON data and performs a simple aggregation.
+- MongoDB schema and test insertions created.
+- Streamlit dashboard visualizes static sample data.
+
+**Week 2: Integration Phase**
+- Connect Collector to Kafka.
+- Integrate Kafka → Spark → MongoDB pipeline.
+- Dashboard connects to MongoDB to show real-time updates.
+- Add emission calculation and regional CO₂ intensity factors.
+
 ## What We Track — and Why
 The following metrics are collected to understand hardware usage, energy draw, and contextual training details.
 
@@ -73,51 +120,21 @@ The following metrics are collected to understand hardware usage, energy draw, a
 | CO₂ Intensity | g CO₂ / kWh (by region) | Convert energy to emissions |
 | Timestamps | UTC time | Enable time series analysis |
 
-## Example of Collected Data (JSON Event)
-```json
-{
-  "timestamp": "2025-10-14T14:25:23Z",
-  "run_id": "run_001",
-  "user_id": "alice",
-  "model_name": "resnet18",
-  "cpu_utilization_pct": 73.4,
-  "gpu_power_w": 142.3,
-  "gpu_mem_used_mb": 2104,
-  "ram_used_mb": 8650,
-  "net_sent_mb": 1.4,
-  "net_recv_mb": 0.8,
-  "region_iso": "DE",
-  "grid_carbon_intensity_g_per_kwh": 401
-}
-```
-
 ## Data Flow & Processing
 1. **Metrics Collector**  
-   A lightweight Python service collects local system stats using psutil and pynvml.  
-   Each record is serialized as JSON and sent to a Kafka topic (`training.metrics`).
+   Collects local system metrics and sends JSON messages to Kafka (`training.metrics`).
 
 2. **Kafka (Ingestion Layer)**  
-   Acts as a distributed buffer for metric streams coming from multiple machines or users.
+   Acts as a distributed buffer for metric streams from multiple machines or users.
 
 3. **Spark Structured Streaming**  
-   - Reads metric messages from Kafka  
-   - Performs transformations: windowed aggregations, joins, and custom UDFs  
-   - Calculates:
-     ```python
-     energy_kwh = (gpu_power_w + cpu_power_w) * delta_t / 3_600_000
-     emissions_kg = energy_kwh * grid_carbon_intensity_g_per_kwh / 1000
-     ```
-   - Stores rolling aggregates per user and model.
+   Reads Kafka messages, performs windowed aggregations, computes energy (kWh) and emissions (kg CO₂), and writes results to MongoDB.
 
 4. **Storage Layer**  
-   - MongoDB (Hot Data): For latest metrics and visualization.  
-   - HDFS (Cold Data): For long-term retention and analytics.
+   MongoDB for recent data (hot storage) and HDFS for historical data (cold storage).
 
 5. **Visualization Layer**  
-   - Streamlit dashboard displaying:
-     - Energy & CO₂ over time  
-     - Top energy-consuming models/users  
-     - Regional carbon impact comparison  
+   Streamlit dashboard showing per-user and per-run energy consumption and emissions.
 
 ## Data Schema (Spark)
 | Column | Type | Description |
@@ -148,13 +165,6 @@ The following metrics are collected to understand hardware usage, energy draw, a
 - Designed Kappa architecture  
 - Drafted metrics collector (Python prototype)  
 - Next steps: Implement Kafka ingestion, Spark consumer, and visualization
-
-## Next Steps
-- Implement Kafka Producer for metric streaming  
-- Develop Spark Structured Streaming job for real-time aggregation  
-- Connect MongoDB for fast retrieval  
-- Build Streamlit dashboard for visualization  
-- Evaluate scalability with multiple concurrent users and training runs  
 
 ## References
 - CodeCarbon GitHub Repository: https://github.com/mlco2/codecarbon  
